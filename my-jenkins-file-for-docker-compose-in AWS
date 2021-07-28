@@ -1,0 +1,37 @@
+# THIS IS DONE AWS
+node
+{
+def buildNumber = BUILD_NUMBER
+stage ("git cloning")
+{
+git credentialsId: 'github-credentials', url: 'https://github.com/vasu-practice/spring-boot-mongo-docker.git'
+}
+stage ("building the package")
+{
+def mavenHome = tool name: "maven", type: "maven"
+sh "${mavenHome}/bin/mvn package"    
+}
+stage ("Build the docker image")
+{
+sh "docker build -t vasudockerhubacc/spring-boot-mongo-docker:${buildNumber} ."
+}
+stage ("docker login and push the images to docker hub")
+{
+withCredentials([string(credentialsId: 'docker_hub_pwd', variable: 'docker_hub_pwd')])
+{
+sh "docker login -u vasudockerhubacc -p ${docker_hub_pwd}"  
+}
+sh "docker push vasudockerhubacc/spring-boot-mongo-docker:${buildNumber}"
+}
+stage("changing tag using sed") 
+{
+sh "sed -i s/latest/${buildNumber}/ docker-compose.yml"
+}  
+stage ("copying docker-compose.yml file deployment server")
+{
+   sshagent(['docker_dev_server_ssh'])
+{
+sh "ssh -o StrictHostkeyChecking=no ubuntu@3.108.217.80 docker-compose up -d"                 
+}
+}
+}
